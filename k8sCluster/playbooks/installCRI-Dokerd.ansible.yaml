@@ -1,0 +1,22 @@
+- name: Installs cri-dockerd
+  hosts: myhosts
+  become: true
+  tasks:
+    - name: Copy .deb file
+      ansible.builtin.copy:
+        src: ../binaries/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb
+        dest: "/home/{{ ansible_user }}/cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb"
+        mode: "0755"
+
+    - name: Install a package
+      ansible.builtin.shell: sudo dpkg -i cri-dockerd_0.3.16.3-0.debian-bookworm_amd64.deb # noqa: command-instead-of-shell
+      changed_when: false
+
+    - name: Write the status in var
+      ansible.builtin.command: systemctl status cri-docker.service
+      register: status_of_cri_dockerd
+      changed_when: false
+
+    - name: Debug the status of cri-docker installation
+      ansible.builtin.debug:
+        var: status_of_cri_dockerd

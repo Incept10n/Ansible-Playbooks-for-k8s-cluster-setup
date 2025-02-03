@@ -1,0 +1,23 @@
+- name: Steps to do after init of a cluster
+  hosts: master
+  become: true
+  tasks:
+    - name: Change ownership of kube config
+      ansible.builtin.file:
+        path: /etc/kubernetes/admin.conf
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Setting explicitly KUBECONFIG env
+      ansible.builtin.lineinfile:
+        path: /home/{{ ansible_user }}/.bashrc
+        line: "export KUBECONFIG=/etc/kubernetes/admin.conf"
+      changed_when: false
+
+    - name: Reload .bashrc for current session
+      ansible.builtin.shell: source /home/{{ ansible_user }}/.bashrc
+      args:
+        executable: /bin/bash
+      become_user: "{{ ansible_user }}"
+      changed_when: false

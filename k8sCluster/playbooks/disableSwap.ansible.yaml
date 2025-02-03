@@ -1,0 +1,13 @@
+- name: Disabling swap
+  hosts: myhosts
+  become: true
+  tasks:
+    - name: Disable swap
+      ansible.builtin.lineinfile:
+        state: absent
+        dest: /etc/fstab
+        regexp: ^/swap.*$
+
+    - name: Restart the servers
+      ansible.builtin.command: reboot
+      changed_when: false

@@ -1,0 +1,31 @@
+- name: Configure cgroups driver
+  hosts: myhosts
+  become: true
+  tasks:
+    - name: Ensure the cgroup-driver flag is set to systemd
+      ansible.builtin.lineinfile:
+        path: /lib/systemd/system/cri-docker.service
+        regexp: '^ExecStart=.*'
+        line: 'ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd:// --docker-endpoint unix:///var/run/docker.sock'
+        backrefs: true
+
+    - name: Reload systemd to apply changes
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart cri-docker service
+      ansible.builtin.systemd:
+        name: cri-docker.service
+        state: restarted
+
+    - name: Copy the Docker daemon.json configuration file
+      ansible.builtin.copy:
+        src: ../configs/daemon.json
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+
+    - name: Restart Docker service to apply changes
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+        daemon_reload: true

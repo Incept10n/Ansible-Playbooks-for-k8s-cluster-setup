@@ -1,0 +1,60 @@
+- name: Kubeadm installation
+  hosts: myhosts
+  become: true
+  tasks:
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install apt-transport-https ca-certificates curl gpg
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+
+    - name: Create /etc/apt/keyrings
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download the public signing key for the Kubernetes package repositories
+      ansible.builtin.shell: curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg # noqa: command-instead-of-module
+      # noqa: yaml[line-length]
+      # noqa: risky-shell-pipe
+      changed_when: false
+
+    - name: Add the appropriate Kubernetes apt repository
+      ansible.builtin.shell: echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list # noqa: risky-shell-pipe
+      # noqa: yaml[line-length]
+      changed_when: false
+
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install kubelet kubeadm kubectl
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Mark kubelet, kubeadm, and kubectl on hold
+      ansible.builtin.command: apt-mark hold kubelet kubeadm kubectl
+      changed_when: false
+
+    - name: Enable the kubelet service before running kubeadm
+      ansible.builtin.shell: sudo systemctl enable --now kubelet
+      changed_when: false # noqa: command-instead-of-shell
+
+# The kubelet is now restarting every few seconds, as it waits in a crashloop for kubeadm to tell it what to do.
+
+# To make sure, that everything works following commands can be run:
+# kubeadm version
+# kubectl version --client
+# sudo systemctl status kubelet

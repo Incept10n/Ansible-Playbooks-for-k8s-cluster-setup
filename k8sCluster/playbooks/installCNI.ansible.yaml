@@ -1,0 +1,15 @@
+- name: Install Calico CNI on Kubernetes Cluster
+  hosts: master
+  become: true
+  tasks:
+    - name: Download and apply Calico manifest
+      ansible.builtin.shell: |
+        kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+      args:
+        chdir: /tmp
+      register: calico_install_output
+      changed_when: false
+
+    - name: Show output of Calico installation
+      ansible.builtin.debug:
+        msg: "{{ calico_install_output.stdout }}"
