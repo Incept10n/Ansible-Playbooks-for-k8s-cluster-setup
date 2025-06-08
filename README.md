@@ -32,7 +32,7 @@ After that u can join your worker nodes to your cluster.
 
 Use ```kubeadm token create --print-join-command``` on master to get join command.
 
-Then go to worker and insert it but in the end also add ```--cri-socket /var/run/cri-dockerd.sock```.
+Then go to worker and insert it (don't forget to put sudo at the start) but in the end also add ```--cri-socket /var/run/cri-dockerd.sock```.
 
 Full command will look like this:
 
