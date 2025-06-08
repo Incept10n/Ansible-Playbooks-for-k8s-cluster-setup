@@ -4,7 +4,7 @@
   tasks:
     - name: Download and apply Calico manifest
       ansible.builtin.shell: |
-        kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+        kubectl apply --kubeconfig=/etc/kubernetes/admin.conf -f https://docs.projectcalico.org/manifests/calico.yaml
       args:
         chdir: /tmp
       register: calico_install_output
