@@ -1,0 +1,50 @@
+- name: Copy docker installation script
+  ansible.builtin.copy:
+    src: dockerEngine.sh
+    dest: "/home/{{ ansible_user }}/dockerEngine.sh"
+    mode: "0755"
+
+- name: Set up Docker's apt repository
+  ansible.builtin.shell: "/home/{{ ansible_user }}/dockerEngine.sh"
+  changed_when: false
+
+- name: Install the Docker packages
+  ansible.builtin.apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    update_cache: true
+
+- name: Add the current user to the docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Run docker hello-world
+  ansible.builtin.command: sudo docker run hello-world
+  changed_when: false
+
+- name: Check running containers
+  ansible.builtin.shell: docker ps -a | grep "hello-world"
+  register: docker_ps_output
+  changed_when: false
+
+- name: Debug Docker container list
+  ansible.builtin.debug:
+    var: docker_ps_output
+
+- name: Get list of hello-world containers
+  ansible.builtin.shell: |
+    docker ps -a -q --filter "ancestor=hello-world"
+  register: hello_world_containers
+  changed_when: false
+
+- name: Remove hello-world containers
+  ansible.builtin.shell: docker rm {{ item }}
+  loop: "{{ hello_world_containers.stdout_lines }}"
+  when: hello_world_containers.stdout_lines | length > 0
+  changed_when: true

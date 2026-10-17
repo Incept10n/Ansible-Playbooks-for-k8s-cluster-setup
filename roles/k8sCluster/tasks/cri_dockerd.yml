@@ -1,0 +1,18 @@
+- name: Download cri-dockerd .deb package
+  ansible.builtin.get_url:
+    url: "https://github.com/Mirantis/cri-dockerd/releases/download/v{{ cri_dockerd_version }}/cri-dockerd_{{ cri_dockerd_version }}.3-0.ubuntu-noble_{{ cri_dockerd_arch }}.deb"
+    dest: "/tmp/cri-dockerd_{{ cri_dockerd_version }}.3-0.ubuntu-noble_{{ cri_dockerd_arch }}.deb"
+    mode: "0644"
+
+- name: Install cri-dockerd package
+  ansible.builtin.apt:
+    deb: "/tmp/cri-dockerd_{{ cri_dockerd_version }}.3-0.ubuntu-noble_{{ cri_dockerd_arch }}.deb"
+
+- name: Write the status in var
+  ansible.builtin.command: systemctl status cri-docker.service
+  register: status_of_cri_dockerd
+  changed_when: false
+
+- name: Debug the status of cri-docker installation
+  ansible.builtin.debug:
+    var: status_of_cri_dockerd

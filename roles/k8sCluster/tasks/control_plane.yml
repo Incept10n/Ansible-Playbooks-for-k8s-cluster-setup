@@ -1,0 +1,11 @@
+- name: Initialize the cluster with kubeadm
+  ansible.builtin.import_tasks: init_cluster.yml
+  tags: [init]
+
+- name: Run the post-initialization steps
+  ansible.builtin.import_tasks: after_init.yml
+  tags: [after-init]
+
+- name: Install the CNI
+  ansible.builtin.import_tasks: cni.yml
+  tags: [cni]

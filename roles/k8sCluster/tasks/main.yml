@@ -1,0 +1,19 @@
+- name: Install Docker Engine
+  ansible.builtin.import_tasks: docker.yml
+  tags: [docker]
+
+- name: Install cri-dockerd
+  ansible.builtin.import_tasks: cri_dockerd.yml
+  tags: [cri-dockerd]
+
+- name: Disable swap
+  ansible.builtin.import_tasks: disable_swap.yml
+  tags: [swap]
+
+- name: Configure cgroup drivers
+  ansible.builtin.import_tasks: cgroups.yml
+  tags: [cgroups]
+
+- name: Install kubeadm, kubelet and kubectl
+  ansible.builtin.import_tasks: kube_tools.yml
+  tags: [kube-tools]

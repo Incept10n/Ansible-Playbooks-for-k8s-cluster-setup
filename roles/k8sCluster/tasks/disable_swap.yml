@@ -1,0 +1,39 @@
+- name: Check whether swap is currently active
+  ansible.builtin.command: swapon --noheadings --show=NAME
+  register: swap_status
+  changed_when: false
+
+- name: Disable active swap
+  ansible.builtin.command: swapoff -a
+  when: swap_status.stdout | trim | length > 0
+
+- name: Remove swap entries from /etc/fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\s*[^#\n].*\s+swap\s+'
+    state: absent
+
+- name: Check for a zram-generator configuration
+  ansible.builtin.stat:
+    path: /etc/systemd/zram-generator.conf
+  register: zram_generator_conf
+
+- name: Remove zram-generator configuration so zram swap stays off after reboot
+  ansible.builtin.file:
+    path: /etc/systemd/zram-generator.conf
+    state: absent
+  when: zram_generator_conf.stat.exists
+
+- name: Mask the zram swap setup unit
+  ansible.builtin.systemd:
+    name: systemd-zram-setup@zram0.service
+    enabled: false
+    masked: true
+  when: zram_generator_conf.stat.exists
+  failed_when: false
+
+- name: Verify swap is disabled
+  ansible.builtin.command: swapon --noheadings --show=NAME
+  register: swap_status_after
+  changed_when: false
+  failed_when: swap_status_after.stdout | trim | length > 0

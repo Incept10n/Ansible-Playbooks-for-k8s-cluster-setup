@@ -1,0 +1,9 @@
+- name: Check whether the cluster is already initialized
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_admin_conf
+
+- name: Initialize the cluster with kubeadm
+  ansible.builtin.shell: kubeadm init --cri-socket /var/run/cri-dockerd.sock
+  when: not kubeadm_admin_conf.stat.exists
+  changed_when: true

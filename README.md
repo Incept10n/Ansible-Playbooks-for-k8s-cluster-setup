@@ -1,112 +1,151 @@
 # Kubernetes Cluster Setup Guide
 
-This README provides a step-by-step guide to setup and configure Kubernetes (K8s) cluster in minutes.
+Ansible role + a single playbook that provisions a Kubernetes cluster (1 control-plane node + any number of worker nodes) on Ubuntu Server in minutes.
+
+It installs Docker Engine + cri-dockerd as the container runtime, kubeadm/kubelet/kubectl, initializes the control plane and installs Calico as the CNI.
 
 ## TLDR
 
-If you are familiar with Ansible u can do following steps:
+1. Create Ubuntu Server machines (1 master, N workers).
+2. Edit `inventory.yml` — only the host address (`ansible_host`) is required.
+3. Run everything with one command:
 
-1. Setup ubuntu-server mashines with the amount u need. (In that repo setup only for 1 master node and any amount of worker nodes) 
+```bash
+ansible-playbook setupK8sCluster.ansible.yaml -i inventory.yml
+```
 
-2. Configure inventory file, it should contain fields such as "ansible_host", "ansible_user", "ansible_password", "ansible_become_password", "ansible_ssh_pass", and other if needed, look at [ansible inventory docs](https://docs.ansible.com/ansible/latest/inventory_guide/intro_inventory.html) for reference.
+4. Join worker nodes (manual, see [Join your worker nodes](#join-your-worker-nodes)).
 
-3. Run playbooks in following order:
+## Requirements
 
-   3.1 installDockerEngine.ansible.yaml
+### On the machines (nodes)
 
-   3.2 installCRI-Dokerd.ansible.yaml
+- Ubuntu Server (tested on 22.04 / 24.04 / 26.04 "Resolute Raccoon").
+- Minimum 2 GB RAM and 2 CPUs per node.
+- SSH access with a user that can `sudo` (passwordless `sudo` recommended — otherwise set `ansible_become_password`).
+- `python3` present (installed by default on Ubuntu).
+- [Required Kubernetes ports](https://kubernetes.io/docs/reference/networking/ports-and-protocols/) open between the nodes; all nodes must be able to reach each other.
+- A fresh machine is best — the role disables swap and manages Docker/cri-dockerd system-wide.
 
-   3.3 disableSwap.ansible.yaml
+### On the controller (where you run Ansible)
 
-   3.4 configureCgroups.ansible.yaml
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) installed.
 
-   3.5 installKubeadmKubeletKubectl.ansible.yaml
+## Inventory (`inventory.yml`)
 
-   3.6 initCluster.ansible.yaml
+The **only required variable is `ansible_host`** (the address/hostname of the node). Everything else is optional and can be omitted if you connect with an SSH key and use passwordless `sudo`:
 
-   3.7 afterInitSteps.ansible.yaml
+```yaml
+myhosts:
+  hosts:
+    master:
+      ansible_host: 10.0.0.10
+    worker1:
+      ansible_host: 10.0.0.11
+    worker2:
+      ansible_host: 10.0.0.12
+```
 
-   3.8 installCNI.ansible.yaml
+- **The control-plane host must be named `master`** — the playbook targets it by that name. Worker host names are free-form.
+- Optional variables (add only if needed):
+  - `ansible_user` — SSH user, if it differs from your local user.
+  - `ansible_port` — SSH port, if not 22.
+  - `ansible_password` / `ansible_ssh_pass` — SSH password, if not using keys.
+  - `ansible_become_password` — sudo password, if sudo is not passwordless.
 
-After that u can join your worker nodes to your cluster.   
+You do **not** need `ansible_connection: ssh` (it is the default) or the other fields that appeared in older versions of this inventory.
 
-Use ```kubeadm token create --print-join-command``` on master to get join command.
+## Run the playbook
 
-Then go to worker and insert it (don't forget to put sudo at the start) but in the end also add ```--cri-socket /var/run/cri-dockerd.sock```.
+```bash
+ansible-playbook setupK8sCluster.ansible.yaml -i inventory.yml
+```
 
-Full command will look like this:
+One invocation runs everything in the correct order.
 
-```sudo kubeadm join 192.168.50.5:6443 --token gnwckma1dagi6a0 --discovery-token-ca-cert-hash sha256:db871b6b97101f508304894aa1e28236db7e529c7fe64887 --cri-socket /var/run/cri-dockerd.sock```
+## What the playbook does
 
-# Full steps
+**Play 1 — all nodes (`myhosts`):**
 
-## Prerequisites
+| Order | Task file | What it does |
+|---|---|---|
+| 1 | `docker.yml` | Installs Docker Engine + adds the current user to the `docker` group |
+| 2 | `cri_dockerd.yml` | Downloads and installs cri-dockerd |
+| 3 | `disable_swap.yml` | Disables swap (active swap, `/etc/fstab`, and zram) and verifies it |
+| 4 | `cgroups.yml` | Sets the `systemd` cgroup driver for cri-dockerd and Docker |
+| 5 | `kube_tools.yml` | Installs `kubeadm`, `kubelet`, `kubectl` and holds their versions |
 
-- Ubuntu server (whatever amount you want).
-- Minimum 2GB of RAM.
-- At least 2 CPUs.
-- 1 master node and any amount of worker nodes
+**Play 2 — control plane (`master`):**
 
-## Short description of repo files
+| Order | Task file | What it does |
+|---|---|---|
+| 6 | `init_cluster.yml` | `kubeadm init` (skipped if the cluster already exists) |
+| 7 | `after_init.yml` | Fixes kubeconfig ownership and exports `KUBECONFIG` |
+| 8 | `cni.yml` | Installs the Calico CNI |
 
-**binaries** - contains cri-dockerd binary file for communication between docker and k8s.
+## Versions and running parts of the role
 
-**configs** - contains config for for setting docker cgroupdriver to systemd. 
+All pinned versions live in `roles/k8sCluster/defaults/main.yml`:
 
-**playbooks** - ansible playbooks for setting up k8s cluster
+```yaml
+cri_dockerd_version: "0.4.9"
+cri_dockerd_arch: amd64
+kubernetes_version: "v1.37"
+calico_version: "v3.33.0"
+```
 
-**scripts** - contains script for docker engine installation
+Bump a version there and re-run (or override on the command line with `-e kubernetes_version=v1.37`).
 
-**inventory.yml** - ansible inventory file
+Each step is tagged, so you can run a single part:
 
-## Edit inventory file
+```bash
+ansible-playbook setupK8sCluster.ansible.yaml -i inventory.yml --tags cni
+```
 
-Edit inventory file so it contains needed info for connection to your nodes. Do only one master node and whatever amount of worker nodes.
+Tags: `docker`, `cri-dockerd`, `swap`, `cgroups`, `kube-tools`, `init`, `after-init`, `cni`.
 
-The "master" name in the "hosts" used by playbook, so don't change it.
+## Repository layout
 
-## Setup Network
+```
+setupK8sCluster.ansible.yaml   # the single entry-point playbook
+inventory.yml                  # node list (only ansible_host required)
+roles/k8sCluster/
+  defaults/main.yml            # pinned versions
+  files/                       # dockerEngine.sh, daemon.json
+  tasks/                       # one file per step (see the table above)
+```
 
-After setting up inventory file, make sure u have a proper connection to hosts.
+## Make sure everything works
 
-Also u need to be sure that [required ports](https://kubernetes.io/docs/reference/networking/ports-and-protocols/) are open for k8s communication between nodes. And be sure all nodes also can communicate between each other.
+SSH to the master node and check:
 
-## Run playbooks
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
 
-[Install ansible](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) if you don't have it yet. 
-
-To run playbooks use ```ansible-playbook <path-to-playbook> -i <path-to-inventory-file>``` 
-
-Run Playbooks in following order:
-
-1. installDockerEngine.ansible.yaml
-
-2. installCRI-Dokerd.ansible.yaml
-
-3. disableSwap.ansible.yaml
-
-4. configureCgroups.ansible.yaml
-
-5. installKubeadmKubeletKubectl.ansible.yaml
-
-6. initCluster.ansible.yaml
-
-7. afterInitSteps.ansible.yaml
-
-8. installCNI.ansible.yaml
-
-## Make sure everything works!
-
-You can ssh to master node and check that everything works using command ```kubectl get nodes``` and ```kubectl get pods -A```. You should see that node is "Ready" and all pods are running succesfully. If not, wait a little bit, sometimes pods needs time to pull images and other processes.
+The master should be `Ready` and all pods should eventually be `Running`. Pods can take a minute to pull images.
 
 ## Join your worker nodes
 
-After you can join your worker nodes to your cluster.   
+The role prepares the worker nodes (runtime, kubelet, etc.) but does **not** join them — run the join manually on each worker:
 
-Use ```kubeadm token create --print-join-command``` on master to get join command.
+1. On the **master**, print the join command:
 
-Then go to worker and insert it but in the end also add ```--cri-socket /var/run/cri-dockerd.sock```.
+```bash
+kubeadm token create --print-join-command
+```
 
-Full command will look like this:
+2. On **each worker**, run the printed command with `sudo` **and** append the cri-dockerd socket:
 
-```sudo kubeadm join 192.168.50.5:6443 --token gnwckma1dagi6a0 --discovery-token-ca-cert-hash sha256:db871b6b97101f508304894aa1e28236db7e529c7fe64887 --cri-socket /var/run/cri-dockerd.sock```
+```bash
+sudo kubeadm join <control-plane-host>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash> --cri-socket /var/run/cri-dockerd.sock
+```
+
+Example:
+
+```bash
+sudo kubeadm join 192.168.50.5:6443 --token gnwckma1dagi6a0 --discovery-token-ca-cert-hash sha256:db871b6b97101f508304894aa1e28236db7e529c7fe64887 --cri-socket /var/run/cri-dockerd.sock
+```
+
+Then verify on the master with `kubectl get nodes`.

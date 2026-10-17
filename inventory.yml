@@ -2,28 +2,9 @@ myhosts:
   hosts:
 
     master:
-      ansible_host: 1.2.3.4
-      ansible_user: master_user
-      ansible_password: master_pass
-      ansible_become_password: master_pass
-      ansible_connection: ssh
-      ansible_ssh_pass: master_pass
-      ansible_port: 999
+      ansible_host: k8s-master-node
+      ansible_user: incept1on
 
     worker1:
-      ansible_host: 1.2.3.5
-      ansible_user: worker1_user
-      ansible_password: worker1_pass
-      ansible_become_password: worker1_pass
-      ansible_connection: ssh
-      ansible_ssh_pass: worker1_pass
-      ansible_port: 999
-
-    worker2:
-      ansible_host: 1.2.3.6
-      ansible_user: worker2_user
-      ansible_password: worker2_pass
-      ansible_become_password: worker2_pass
-      ansible_connection: ssh
-      ansible_ssh_pass: worker2_pass
-      ansible_port: 999
+      ansible_host: k8s-worker-node
+      ansible_user: incept1on

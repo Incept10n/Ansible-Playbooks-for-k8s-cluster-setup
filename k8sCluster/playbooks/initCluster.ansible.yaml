@@ -1,7 +1,0 @@
-- name: Creating a cluster with kubeadm
-  hosts: master
-  become: true
-  tasks:
-    - name: Kubeadm init
-      ansible.builtin.shell: kubeadm init --cri-socket /var/run/cri-dockerd.sock # noqa: command-instead-of-shell
-      changed_when: false

@@ -1,0 +1,4 @@
+cri_dockerd_version: "0.4.9"
+cri_dockerd_arch: amd64
+kubernetes_version: "v1.37"
+calico_version: "v3.33.0"
