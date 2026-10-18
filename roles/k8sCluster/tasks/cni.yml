@@ -1,8 +1,18 @@
-- name: Download and apply the Calico manifest
-  ansible.builtin.shell: |
-    kubectl apply --kubeconfig=/etc/kubernetes/admin.conf -f https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml
-  args:
-    chdir: /tmp
+- name: Download the Calico manifest
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
+    dest: /tmp/calico.yaml
+    mode: "0644"
+    timeout: 30
+
+- name: Apply the Calico manifest
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --kubeconfig=/etc/kubernetes/admin.conf
+      - -f
+      - /tmp/calico.yaml
   register: calico_install_output
   changed_when: false
 
